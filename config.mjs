@@ -1,0 +1,10 @@
+export const CONFIG = {
+    HIDDEN_LAYER_LENGTHS: [64, 64],
+    GAME_STATE_SIZE: 30,
+    ACTION_SIZE: 6,
+    LEARNING_RATE: 0.001,
+    LOSS: 'meanSquaredError',
+    BATCH_SIZE: 64,
+    DISCOUNT_FACTOR: 0.96,
+    REWARD_NORMALIZATION: 1/100
+};
