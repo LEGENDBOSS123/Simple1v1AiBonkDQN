@@ -3,7 +3,7 @@ import { map } from "./getMap.mjs";
 import { Time } from "./Time.mjs";
 
 export function setupLobby() {
-    if(top.settedUpLobby){
+    if (top.settedUpLobby) {
         return;
     }
     top.commandhandle("/sandbox");
@@ -11,7 +11,7 @@ export function setupLobby() {
     top.commandhandle("/addname Bot 2");
 
     Time.sleep(500);
-    let ids = Object.keys(playerids).sort((a,b)=>{return Number(b)-Number(a)}).slice(0,2).map(Number);
+    let ids = Object.keys(playerids).sort((a, b) => { return Number(b) - Number(a) }).slice(0, 2).map(Number);
     CONFIG.PLAYER_ONE_ID = ids[0];
     CONFIG.PLAYER_TWO_ID = ids[1];
 
