@@ -6,6 +6,7 @@ import { setupLobby } from "./setupLobby.mjs";
 import { setupModel } from "./setupModel.mjs";
 import { State } from "./State.mjs";
 import { tf } from "./tf.mjs";
+import { train } from "./train.mjs";
 
 await setupLobby();
 
@@ -41,10 +42,8 @@ async function gameLoop() {
 
             let rewardCurrentFrame = newState.reward();
             let rewardP1 = rewardCurrentFrame.p1;
-            let rewardP2 = rewardCurrentFrame.p2;
 
             let actionP1 = getAction(CONFIG.PLAYER_ONE_ID);
-            let actionP2 = getAction(CONFIG.PLAYER_TWO_ID);
 
             // player1 memory
             memory.push({
@@ -55,20 +54,32 @@ async function gameLoop() {
                 done: newState.done
             });
 
+            if (memory.length >= CONFIG.BATCH_SIZE) {
+                log("Training...");
+                const loss = await train(models.at(-1), memory);
+                if (loss) {
+                    log(`Loss - Actor: ${loss.actorLoss.toFixed(5)}`);
+                }
+                memory = [];
+            }
 
-            let predictedActionP1 = predictActionArray(models.at(-1).actor, newState.toArray());
-            log(predictedActionP1);
-            move(CONFIG.PLAYER_ONE_ID, sampleBernoulli(predictedActionP1));
-
-            safeFrames++;
-            if (safeFrames > 300) {
-                log("Match timed out after 15 seconds.");
+            if (safeFrames > 300 || newState.done) {
+                log("Round over.");
                 break;
             }
+
+            let predictedActionsP1 = predictActionArray(models.at(-1).actor, newState.toArray());
+            log(predictedActionsP1);
+            move(CONFIG.PLAYER_ONE_ID, sampleBernoulli(predictedActionsP1));
+
+            safeFrames++;
+            lastState = newState;
+
             // 20 FPS
             await Time.sleep(50);
-            lastState = newState;
         }
+
+        break;
     }
 }
 
