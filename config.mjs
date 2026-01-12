@@ -5,7 +5,6 @@ export const CONFIG = {
     ACTION_SIZE: 6,
     ACTOR_LEARNING_RATE: 0.001,
     CRITIC_LEARNING_RATE: 0.001,
-    LOSS: 'meanSquaredError',
     BATCH_SIZE: 64,
     DISCOUNT_FACTOR: 0.96,
     ENTROPY_COEFFICIENT: 0.01,

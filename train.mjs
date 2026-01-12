@@ -2,7 +2,9 @@ import { CONFIG } from "./config.mjs";
 import { tf } from "./tf.mjs";
 
 export async function train(model, memory) {
-    if (memory.length < CONFIG.BATCH_SIZE) return null;
+    if (memory.length < CONFIG.BATCH_SIZE) {
+        return null;
+    }
     const batch = memory.slice(-CONFIG.BATCH_SIZE);
     const actor = model.actor;
     const critic = model.critic;
