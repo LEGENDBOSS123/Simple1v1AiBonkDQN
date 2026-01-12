@@ -31,6 +31,8 @@ export class State {
                 special: false
             }
         };
+        this.done = false;
+        this.winnerId = null;
     }
 
     fetch() {
@@ -48,6 +50,42 @@ export class State {
         this.player2.vx = p2data.xvel / top.scale;
         this.player2.vy = p2data.yvel / top.scale;
         this.player2.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_TWO_ID));
+
+        this.done = !p1data.alive || !p2data.alive;
+        if (this.done) {
+            if (!p1data.alive && !p2data.alive) {
+                this.winnerId = null;
+            } else if (!p1data.alive) {
+                this.winnerId = CONFIG.PLAYER_TWO_ID;
+            } else {
+                this.winnerId = CONFIG.PLAYER_ONE_ID;
+            }
+        }
+    }
+
+    reward() {
+        if (!this.done) {
+            return {
+                p1: 0,
+                p2: 0
+            };
+        }
+        if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
+            return {
+                p1: 1,
+                p2: -1
+            };
+        } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
+            return {
+                p1: -1,
+                p2: 1
+            };
+        } else {
+            return {
+                p1: 0,
+                p2: 0
+            };
+        }
     }
 
     toArray() {

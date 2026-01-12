@@ -3,7 +3,7 @@ import { tf } from "./tf.mjs";
 
 // Actor Critic
 
-export async function setupModel() {
+export function setupModel() {
     // Actor
     const actor = tf.sequential();
     actor.add(tf.layers.dense({
