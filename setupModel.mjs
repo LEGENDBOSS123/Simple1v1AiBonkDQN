@@ -1,37 +1,61 @@
 import { CONFIG } from "./config.mjs";
 import { tf } from "./tf.mjs";
 
+// Actor Critic
+
 export async function setupModel() {
-    const model = tf.sequential();
-
-    model.add(
-        tf.layers.dense({
-            inputShape: [CONFIG.GAME_STATE_SIZE],
-            units: CONFIG.HIDDEN_LAYER_LENGTHS[0],
+    // Actor
+    const actor = tf.sequential();
+    actor.add(tf.layers.dense({
+        inputShape: [CONFIG.GAME_STATE_SIZE],
+        units: CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS[0],
+        activation: 'relu',
+        kernelInitializer: 'heNormal'
+    }));
+    for (let i = 1; i < CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS.length; i++) {
+        actor.add(tf.layers.dense({
+            units: CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS[i],
             activation: 'relu',
-        })
-    );
-    
-    for (let i = 1; i < CONFIG.HIDDEN_LAYER_LENGTHS.length; i++) {
-        model.add(
-            tf.layers.dense({
-                units: CONFIG.HIDDEN_LAYER_LENGTHS[i],
-                activation: 'relu',
-            })
-        );
+            kernelInitializer: 'heNormal'
+        }));
     }
+    actor.add(tf.layers.dense({
+        units: CONFIG.ACTION_SIZE,
+        activation: 'sigmoid',
+        kernelInitializer: 'glorotUniform'
+    }));
 
-    model.add(
-        tf.layers.dense({
-            units: CONFIG.ACTION_SIZE,
-            activation: 'linear',
-        })
-    );
+    // Critic
+    const critic = tf.sequential();
+    critic.add(tf.layers.dense({
+        inputShape: [CONFIG.GAME_STATE_SIZE],
+        units: CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS[0],
+        activation: 'relu',
+        kernelInitializer: 'heNormal'
+    }));
+    for (let i = 1; i < CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS.length; i++) {
+        critic.add(tf.layers.dense({
+            units: CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS[i],
+            activation: 'relu',
+            kernelInitializer: 'heNormal'
+        }));
+    }
+    critic.add(tf.layers.dense({
+        units: 1,
+        activation: 'linear',
+        kernelInitializer: 'glorotUniform'
+    }));
 
-    model.compile({
-        optimizer: tf.train.adam(CONFIG.LEARNING_RATE),
-        loss: CONFIG.LOSS,
-    });
+    const actorOptimizer = tf.train.adam(CONFIG.ACTOR_LEARNING_RATE);
+    const criticOptimizer = tf.train.adam(CONFIG.CRITIC_LEARNING_RATE);
 
+    const model = {
+        actor: actor,
+        critic: critic,
+        optimizer: {
+            actor: actorOptimizer,
+            critic: criticOptimizer
+        }
+    };
     return model;
 }

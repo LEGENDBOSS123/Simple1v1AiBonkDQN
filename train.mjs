@@ -2,47 +2,49 @@ import { CONFIG } from "./config.mjs";
 import { tf } from "./tf.mjs";
 
 export async function train(model, memory) {
-    const batch = sampleBatch(memory, CONFIG.BATCH_SIZE);
-    const lossValue = tf.tidy(() => {
+    if (memory.length < CONFIG.BATCH_SIZE) return null;
+    const batch = memory.slice(-CONFIG.BATCH_SIZE);
+    const actor = model.actor;
+    const critic = model.critic;
+    const actorOptimizer = model.optimizer.actor;
+    const criticOptimizer = model.optimizer.critic;
+
+    let loss = tf.tidy(() => {
         const states = tf.tensor2d(batch.map(m => m.state));
         const nextStates = tf.tensor2d(batch.map(m => m.nextState));
+        const actions = tf.tensor2d(batch.map(m => m.action));
         const rewards = tf.tensor1d(batch.map(m => m.reward));
         const dones = tf.tensor1d(batch.map(m => m.done ? 1 : 0));
 
-        const targetQs = model.predict(states);
-        const nextQs = model.predict(nextStates);
-        const maxNextQs = nextQs.max(1);
+        const values = critic.predict(states).squeeze();
+        const nextValues = critic.predict(nextStates).squeeze();
+        const targets = rewards.add(nextValues.mul(CONFIG.DISCOUNT_FACTOR).mul(tf.scalar(1).sub(dones)));
+        const advantages = targets.sub(values);
 
-        /*
-        if (done == false) {
-            reward = reward + discount_factor * max_next_q
+        const criticLoss = criticOptimizer.minimize(() => {
+            const predictedValues = critic.predict(states).squeeze();
+            return tf.losses.huberLoss(targets, predictedValues);
+        }, true);
+
+        const actorLoss = actorOptimizer.minimize(() => {
+            const actionProbs = actor.predict(states);
+
+            const epsilon = tf.scalar(1e-8);
+            const logProbs = actions.mul(actionProbs.add(epsilon).log()).add(tf.scalar(1).sub(actions).mul(tf.scalar(1).sub(actionProbs).add(epsilon).log()));
+
+            const policyLoss = logProbs.sum(1).mul(advantages).mul(-1).mean();
+            const entropy = actionProbs.mul(actionProbs.add(epsilon).log())
+                .add(tf.scalar(1).sub(actionProbs).mul(tf.scalar(1).sub(actionProbs).add(epsilon).log()))
+                .mul(-1).sum(1).mean()
+
+            return policyLoss.sub(entropy.mul(CONFIG.ENTROPY_COEFFICIENT));
+        }, true);
+
+        return {
+            actorLoss: actorLoss.dataSync()[0],
+            criticLoss: criticLoss.dataSync()[0]
         }
-        */
-        const updatedQs = rewards.add(maxNextQs.mul(CONFIG.DISCOUNT_FACTOR).mul(tf.scalar(1).sub(dones)));
 
-        const targetQsArr = targetQs.arraySync();
-        const updatedQsArr = updatedQs.arraySync();
-        for (let i = 0; i < batch.length; i++) {
-            const memory = batch[i];
-            const targetValue = updatedQsArr[i];
-
-            for (let j = 0; j < CONFIG.ACTION_SIZE; j++) {
-                if (memory.action[j] === 1) {
-                    targetQsArr[i][j] = targetValue;
-                }
-            }
-        }
-
-        const newTargetQs = tf.tensor2d(targetQsArr);
-        return model.trainOnBatch(states, newTargetQs);
     });
-}
-
-function sampleBatch(array, size) {
-    const batch = [];
-    for (let i = 0; i < size; i++) {
-        const index = Math.floor(Math.random() * array.length);
-        batch.push(array[index]);
-    }
-    return batch;
+    return loss;
 }
