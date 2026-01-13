@@ -8,6 +8,8 @@ To install dependencies, run `npm install`
 To build `script.js` run `npm run build`
 Open bonk.io and create a lobby with teams LOCKED.
 Then copy paste `script.js` into bonk.io via inspect element / console
+To save models at any point, in console you can type `top.saveModels()`
+
 
 ### Requirements
 `Node.js`
