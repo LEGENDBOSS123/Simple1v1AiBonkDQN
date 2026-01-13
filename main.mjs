@@ -102,7 +102,7 @@ async function main() {
                 }
                 let predictedActionsP2 = predictActionArray(p2Model.actor, newState.flip().toArray());
                 move(CONFIG.PLAYER_ONE_ID, arrayToAction(predictedActionsP1));
-                // move(CONFIG.PLAYER_TWO_ID, arrayToAction(predictedActionsP2));
+                move(CONFIG.PLAYER_TWO_ID, arrayToAction(predictedActionsP2));
 
                 safeFrames++;
                 lastState = newState;
