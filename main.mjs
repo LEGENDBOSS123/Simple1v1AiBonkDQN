@@ -70,16 +70,6 @@ async function main() {
                     done: newState.done
                 });
 
-                if (newState.done) {
-                    let runningReward = rewardP1;
-                    for (let i = memory.length - 2; i >= 0; i--) {
-                        if (memory[i].done) {
-                            break;
-                        }
-                        runningReward = memory[i].reward + CONFIG.DISCOUNT_FACTOR * runningReward;
-                        memory[i].reward = runningReward;
-                    }
-                }
 
                 if (memory.length >= CONFIG.BATCH_SIZE) {
                     log("Training...");
@@ -89,7 +79,7 @@ async function main() {
                         log(`Loss - Actor: ${loss.actorLoss.toFixed(4)}`);
                         log(`Loss - Critic: ${loss.criticLoss.toFixed(4)}`);
                     }
-                    memory = [];
+                    memory.length = 0;
                 }
 
                 if (safeFrames > 300 || newState.done) {

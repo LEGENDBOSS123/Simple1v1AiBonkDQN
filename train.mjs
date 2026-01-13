@@ -13,17 +13,39 @@ export async function train(model, memory) {
     const actorOptimizer = model.optimizer.actor;
     const criticOptimizer = model.optimizer.critic;
 
-    let loss = tf.tidy(() => {
+    const { values, nextValues } = tf.tidy(() => {
         const states = tf.tensor2d(batch.map(m => m.state));
         const nextStates = tf.tensor2d(batch.map(m => m.nextState));
-        const actions = tf.tensor2d(batch.map(m => m.action));
-        const rewards = tf.tensor1d(batch.map(m => m.reward));
-        const dones = tf.tensor1d(batch.map(m => m.done ? 1 : 0));
+        const values = critic.predict(states).squeeze().arraySync();
+        const nextValues = critic.predict(nextStates).squeeze().arraySync();
+        return { values, nextValues };
+    });
 
-        const values = critic.predict(states).squeeze();
-        const nextValues = critic.predict(nextStates).squeeze();
-        const targets = rewards.add(nextValues.mul(CONFIG.DISCOUNT_FACTOR).mul(tf.scalar(1).sub(dones)));
-        const advantages = targets.sub(values);
+    const rewards = batch.map(m => m.reward);
+    const dones = batch.map(m => m.done ? 1 : 0);
+    const advantagesArr = new Array(batch.length);
+    const targetsArr = new Array(batch.length);
+    let gae = 0;
+
+    for (let t = batch.length - 1; t >= 0; t--) {
+        const delta = rewards[t] + (CONFIG.DISCOUNT_FACTOR * nextValues[t] * (1 - dones[t])) - values[t];
+
+        gae = delta + (CONFIG.DISCOUNT_FACTOR * CONFIG.GAE_LAMBDA * (1 - dones[t]) * gae);
+
+        advantagesArr[t] = gae;
+        targetsArr[t] = gae + values[t];
+    }
+    const advMean = advantagesArr.reduce((a, b) => a + b, 0) / advantagesArr.length;
+    const advStd = Math.sqrt(advantagesArr.map(x => Math.pow(x - advMean, 2)).reduce((a, b) => a + b, 0) / advantagesArr.length + 1e-8);
+    const normAdvArr = advantagesArr.map(x => (x - advMean) / (advStd + 1e-8));
+
+    let loss = tf.tidy(() => {
+        const states = tf.tensor2d(batch.map(m => m.state));
+        const actions = tf.tensor2d(batch.map(m => m.action));
+
+        const targets = tf.tensor1d(targetsArr);
+        const advantages = tf.tensor1d(normAdvArr);
+
 
         const criticLoss = criticOptimizer.minimize(() => {
             const predictedValues = critic.predict(states).squeeze();

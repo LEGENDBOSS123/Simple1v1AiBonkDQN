@@ -64,26 +64,21 @@ export class State {
     }
 
     reward() {
-        if (!this.done) {
-            return {
-                p1: 0,
-                p2: 0
-            };
-        }
+
         if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
             return {
-                p1: 1,
-                p2: -1
+                p1: 0.5,
+                p2: -2
             };
         } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
             return {
-                p1: -1,
-                p2: 1
+                p1: -2,
+                p2: 0.5
             };
         } else {
             return {
-                p1: 0,
-                p2: 0
+                p1: -0.001,
+                p2: -0.001
             };
         }
     }
