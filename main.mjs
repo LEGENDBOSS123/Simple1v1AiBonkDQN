@@ -3,7 +3,7 @@ import { log } from "./log.mjs";
 import { arrayToAction, getAction, move, predictActionArray } from "./move.mjs";
 import { Random } from "./Random.mjs";
 import { setupLobby } from "./setupLobby.mjs";
-import { setupModel } from "./setupModel.mjs";
+import { cloneModel, setupModel } from "./setupModel.mjs";
 import { State } from "./State.mjs";
 import { tf } from "./tf.mjs";
 import { Time } from "./Time.mjs";
@@ -17,13 +17,17 @@ async function main() {
 
     let models = [];
     let memory = [];
+    let actor_losses = [];
+    let critic_losses = [];
     top.memory = memory;
     top.models = models;
-    models.push(setupModel());
+    top.actor_losses = actor_losses;
+    top.critic_losses = critic_losses;
+    let currentModel = setupModel();
 
     log("Lobby set up. TensorFlow.js version:", tf.version.tfjs);
-    log(`Actor model initialized with ${models.at(-1).actor.countParams()} parameters.`);
-    log(`Critic model initialized with ${models.at(-1).critic.countParams()} parameters.`);
+    log(`Actor model initialized with ${currentModel.actor.countParams()} parameters.`);
+    log(`Critic model initialized with ${currentModel.critic.countParams()} parameters.`);
 
     async function gameLoop() {
 
@@ -43,7 +47,7 @@ async function main() {
 
             let safeFrames = 0;
 
-            let p2Model = models.at(-1);
+            let p2Model = currentModel;
             if (Math.random() < 0.2 && models.length > 1) {
                 p2Model = Random.choose(models);
             }
@@ -74,10 +78,15 @@ async function main() {
                 if (memory.length >= CONFIG.BATCH_SIZE) {
                     log("Training...");
 
-                    const loss = await train(models.at(-1), memory);
+                    const loss = await train(currentModel, memory);
                     if (loss) {
+                        actor_losses.push(loss.actorLoss);
+                        critic_losses.push(loss.criticLoss);
                         log(`Loss - Actor: ${loss.actorLoss.toFixed(4)}`);
                         log(`Loss - Critic: ${loss.criticLoss.toFixed(4)}`);
+                    }
+                    if(actor_losses.length % CONFIG.SAVE_AFTER_EPISODES === 0) {
+                        models.push(cloneModel(currentModel));
                     }
                     memory.length = 0;
                 }
@@ -87,7 +96,10 @@ async function main() {
                     break;
                 }
 
-                let predictedActionsP1 = predictActionArray(models.at(-1).actor, newState.toArray());
+                let predictedActionsP1 = predictActionArray(currentModel.actor, newState.toArray());
+                if (safeFrames % 60 === 0) {
+                    console.log("AI Confidence:", predictedActionsP1.map(p => p.toFixed(2)));
+                }
                 let predictedActionsP2 = predictActionArray(p2Model.actor, newState.flip().toArray());
                 move(CONFIG.PLAYER_ONE_ID, arrayToAction(predictedActionsP1));
                 // move(CONFIG.PLAYER_TWO_ID, arrayToAction(predictedActionsP2));

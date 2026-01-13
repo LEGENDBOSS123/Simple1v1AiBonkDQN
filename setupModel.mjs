@@ -59,3 +59,11 @@ export function setupModel() {
     };
     return model;
 }
+
+
+export function cloneModel(model) {
+    const newModel = setupModel();
+    newModel.actor.setWeights(model.actor.getWeights());
+    newModel.critic.setWeights(model.critic.getWeights());
+    return newModel;
+}

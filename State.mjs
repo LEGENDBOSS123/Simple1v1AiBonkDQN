@@ -67,18 +67,18 @@ export class State {
 
         if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
             return {
-                p1: 0.5,
-                p2: -2
+                p1: 1,
+                p2: -1.5
             };
         } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
             return {
-                p1: -2,
-                p2: 0.5
+                p1: -1.5,
+                p2: 1
             };
         } else {
             return {
-                p1: -0.001,
-                p2: -0.001
+                p1: +0.01,
+                p2: +0.01
             };
         }
     }
