@@ -1,3 +1,4 @@
+import { log } from "./log.mjs";
 import { tf } from "./tf.mjs";
 
 export const cValueMap = new Map();
@@ -5,9 +6,9 @@ export const keyMap = new Map();
 
 export function getAction(id) {
     if (!keyMap.has(id)) {
-        return top.GET_KEYS(0);
+        return actionToArray(top.GET_KEYS(0));
     }
-    return GET_KEYS(keyMap.get(id));
+    return actionToArray(top.GET_KEYS(keyMap.get(id)));
 }
 
 export function actionToArray(action) {
@@ -23,12 +24,12 @@ export function actionToArray(action) {
 
 export function arrayToAction(arr) {
     return {
-        left: arr[0] == 1,
-        right: arr[1] == 1,
-        up: arr[2] == 1,
-        down: arr[3] == 1,
-        heavy: arr[4] == 1,
-        special: arr[5] == 1
+        left: sampleBernoulli(arr[0]) === 1,
+        right: sampleBernoulli(arr[1]) === 1,
+        up: sampleBernoulli(arr[2]) === 1,
+        down: sampleBernoulli(arr[3]) === 1,
+        heavy: sampleBernoulli(arr[4]) === 1,
+        special: sampleBernoulli(arr[5]) === 1
     };
 }
 

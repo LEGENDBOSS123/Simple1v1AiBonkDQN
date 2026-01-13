@@ -90,10 +90,10 @@ export class State {
 
     toArray() {
         return [
-            this.player1.x / CONFIG.POSITION_NORMALIZATION,
-            this.player1.y / CONFIG.POSITION_NORMALIZATION,
-            this.player1.vx / CONFIG.VELOCITY_NORMALIZATION,
-            this.player1.vy / CONFIG.VELOCITY_NORMALIZATION,
+            this.player1.x * CONFIG.POSITION_NORMALIZATION,
+            this.player1.y * CONFIG.POSITION_NORMALIZATION,
+            this.player1.vx * CONFIG.VELOCITY_NORMALIZATION,
+            this.player1.vy * CONFIG.VELOCITY_NORMALIZATION,
             this.player1.keysPressed.left ? 1 : 0,
             this.player1.keysPressed.right ? 1 : 0,
             this.player1.keysPressed.up ? 1 : 0,
@@ -101,10 +101,10 @@ export class State {
             this.player1.keysPressed.heavy ? 1 : 0,
             this.player1.keysPressed.special ? 1 : 0,
 
-            this.player2.x / CONFIG.POSITION_NORMALIZATION,
-            this.player2.y / CONFIG.POSITION_NORMALIZATION,
-            this.player2.vx / CONFIG.VELOCITY_NORMALIZATION,
-            this.player2.vy / CONFIG.VELOCITY_NORMALIZATION,
+            this.player2.x * CONFIG.POSITION_NORMALIZATION,
+            this.player2.y * CONFIG.POSITION_NORMALIZATION,
+            this.player2.vx * CONFIG.VELOCITY_NORMALIZATION,
+            this.player2.vy * CONFIG.VELOCITY_NORMALIZATION,
             this.player2.keysPressed.left ? 1 : 0,
             this.player2.keysPressed.right ? 1 : 0,
             this.player2.keysPressed.up ? 1 : 0,
