@@ -98,7 +98,8 @@ export async function serializeModels(models, currentModel) {
 }
 
 top.saveModels = async function () {
-    return await serializeModels(top.models, top.currentModel);
+    const serializedModels = await serializeModels(top.models, top.currentModel);
+    await saveBrowserFile(serializedModels, "models.json");
 }
 
 export async function loadModelFromArtifacts(artifacts) {
@@ -118,7 +119,7 @@ export async function deserializeModels(arrayOfArtifacts) {
     return { models, currentModel };
 }
 
-export async function safeBrowserFile(filedata, filename) {
+export async function saveBrowserFile(filedata, filename) {
     const jsonString = JSON.stringify(filedata);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
