@@ -88,6 +88,19 @@ export class State {
         }
     }
 
+    flip() {
+        const newState = new State();
+        newState.player1 = structuredClone(this.player1);
+        newState.player2 = structuredClone(this.player2);
+        newState.done = this.done;
+        newState.winnerId = this.winnerId;
+
+        const temp = newState.player1;;
+        newState.player1 = newState.player2;
+        newState.player2 = temp;
+        return newState;
+    }
+
     toArray() {
         return [
             this.player1.x * CONFIG.POSITION_NORMALIZATION,

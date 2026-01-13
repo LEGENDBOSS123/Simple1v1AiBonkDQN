@@ -2,6 +2,7 @@ import { CONFIG } from "./config.mjs";
 import { log } from "./log.mjs";
 import { tf } from "./tf.mjs";
 
+
 export async function train(model, memory) {
     if (memory.length < CONFIG.BATCH_SIZE) {
         return null;
