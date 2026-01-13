@@ -67,3 +67,96 @@ export function cloneModel(model) {
     newModel.critic.setWeights(model.critic.getWeights());
     return newModel;
 }
+
+export async function downloadModel(model) {
+    const artifacts = await model.save(
+        tf.io.withSaveHandler(async (artifacts) => {
+            return artifacts;
+        })
+    );
+    artifacts.weightData = Array.from(new Float32Array(artifacts.weightData));
+    return artifacts;
+}
+
+export async function serializeModels(models, currentModel) {
+    if (currentModel) {
+        models.push(currentModel);
+    }
+    const arrayOfModels = models;
+
+    const serializedModels = [];
+    for (const model of arrayOfModels) {
+        const artifactsActor = await downloadModel(model.actor);
+        const artifactsCritic = await downloadModel(model.critic);
+        const artifacts = {
+            actor: artifactsActor,
+            critic: artifactsCritic
+        };
+        serializedModels.push(artifacts);
+    }
+    return serializedModels;
+}
+
+top.saveModels = async function () {
+    return await serializeModels(top.models, top.currentModel);
+}
+
+export async function loadModelFromArtifacts(artifacts) {
+    const model = setupModel();
+    model.actor.loadWeights(new Float32Array(artifacts.actor.weightData).buffer, artifacts.actor.weightSpecs);
+    model.critic.loadWeights(new Float32Array(artifacts.critic.weightData).buffer, artifacts.critic.weightSpecs);
+    return model;
+}
+
+export async function deserializeModels(arrayOfArtifacts) {
+    const models = [];
+    for (const artifacts of arrayOfArtifacts) {
+        const model = await loadModelFromArtifacts(artifacts);
+        models.push(model);
+    }
+    const currentModel = models.pop();
+    return { models, currentModel };
+}
+
+export async function safeBrowserFile(filedata, filename) {
+    const jsonString = JSON.stringify(filedata);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+
+export function loadBrowserFile() {
+    return new Promise((resolve, reject) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+
+        input.onchange = (event) => {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    const filedata = JSON.parse(content);
+                    resolve(filedata);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = (e) => {
+                reject(e);
+            };
+            reader.readAsText(file);
+        };
+
+        input.click();
+    });
+}

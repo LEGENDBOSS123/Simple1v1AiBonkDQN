@@ -3,7 +3,7 @@ import { log } from "./log.mjs";
 import { arrayToAction, getAction, move, predictActionArray } from "./move.mjs";
 import { Random } from "./Random.mjs";
 import { setupLobby } from "./setupLobby.mjs";
-import { cloneModel, setupModel } from "./setupModel.mjs";
+import { cloneModel, deserializeModels, loadBrowserFile, setupModel } from "./setupModel.mjs";
 import { State } from "./State.mjs";
 import { tf } from "./tf.mjs";
 import { Time } from "./Time.mjs";
@@ -16,14 +16,30 @@ async function main() {
     await setupLobby();
 
     let models = [];
+    let currentModel = null;
+    const filePrompt = prompt("Do you want to load a model from file? (y/n)", "y") == "y";
+
+    const filedata = filePrompt ? await loadBrowserFile() : null;
+    log(filedata);
+    if (filedata) {
+        const deserialized = await deserializeModels(filedata);
+        models = deserialized.models;
+        currentModel = deserialized.currentModel;
+        log(`Loaded ${models.length} models from file.`);
+    }
+    else{
+        currentModel = setupModel();
+    }
     let memory = [];
+
     let actor_losses = [];
     let critic_losses = [];
+
     top.memory = memory;
+    top.currentModel = currentModel;
     top.models = models;
     top.actor_losses = actor_losses;
     top.critic_losses = critic_losses;
-    let currentModel = setupModel();
 
     log("Lobby set up. TensorFlow.js version:", tf.version.tfjs);
     log(`Actor model initialized with ${currentModel.actor.countParams()} parameters.`);
@@ -97,9 +113,6 @@ async function main() {
                 }
 
                 let predictedActionsP1 = predictActionArray(currentModel.actor, newState.toArray());
-                if (safeFrames % 60 === 0) {
-                    console.log("AI Confidence:", predictedActionsP1.map(p => p.toFixed(2)));
-                }
                 let predictedActionsP2 = predictActionArray(p2Model.actor, newState.flip().toArray());
                 move(CONFIG.PLAYER_ONE_ID, arrayToAction(predictedActionsP1));
                 move(CONFIG.PLAYER_TWO_ID, arrayToAction(predictedActionsP2));
