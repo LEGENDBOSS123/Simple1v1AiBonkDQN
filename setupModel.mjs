@@ -98,7 +98,7 @@ export async function serializeModels(models, currentModel) {
 }
 
 top.saveModels = async function () {
-    const serializedModels = await serializeModels(top.models, top.currentModel);
+    const serializedModels = await serializeModels(top.models(), top.currentModel());
     await saveBrowserFile(serializedModels, "models.json");
 }
 

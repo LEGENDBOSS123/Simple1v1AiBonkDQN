@@ -6,9 +6,10 @@ export async function setupLobby() {
     if (top.settedUpLobby) {
         return;
     }
+    top.changemode("sp");
     top.commandhandle("/sandbox");
-    top.commandhandle("/addname Bot 1");
-    top.commandhandle("/addname Bot 2");
+    top.commandhandle("/addname Side Character");
+    top.commandhandle("/addname Main Character");
 
     await Time.sleep(500);
     let ids = Object.keys(playerids).sort((a, b) => { return Number(b) - Number(a) }).slice(0, 2).map(Number);

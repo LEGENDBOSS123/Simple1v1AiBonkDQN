@@ -15,7 +15,9 @@ export class State {
                 down: false,
                 heavy: false,
                 special: false
-            }
+            },
+            heavyAlpha: 0,
+            grappleCooldown: 0
         };
         this.player2 = {
             x: 0,
@@ -29,7 +31,9 @@ export class State {
                 down: false,
                 heavy: false,
                 special: false
-            }
+            },
+            heavyAlpha: 0,
+            grappleCooldown: 0
         };
         this.done = false;
         this.winnerId = null;
@@ -37,14 +41,38 @@ export class State {
 
     fetch() {
         const p1data = top.playerids[CONFIG.PLAYER_ONE_ID].playerData2;
+        const p1rawdata = top.playerids[CONFIG.PLAYER_ONE_ID].playerData;
         this.player1.x = p1data.px / top.scale;
         this.player1.y = p1data.py / top.scale;
         this.player1.vx = p1data.xvel / top.scale;
         this.player1.vy = p1data.yvel / top.scale;
-
+        try {
+            this.player1.heavyAlpha = p1rawdata.children[3].alpha;
+        } catch (e) {
+            this.player1.heavyAlpha = 0;
+        }
+        this.player1.grappleCooldown = 36 / 184;
+        try {
+            if (p1rawdata.children[5].batches.length == 1) {
+                this.player1.grappleCooldown = p1rawdata.children[5].batches[0].vertexData.length / 184;
+            }
+        } catch (e) { }
         this.player1.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_ONE_ID));
 
+
         const p2data = top.playerids[CONFIG.PLAYER_TWO_ID].playerData2;
+        const p2rawdata = top.playerids[CONFIG.PLAYER_TWO_ID].playerData;
+        try {
+            this.player2.heavyAlpha = p2rawdata.children[3].alpha;
+        } catch (e) {
+            this.player2.heavyAlpha = 0;
+        }
+        this.player2.grappleCooldown = 36 / 184;
+        try {
+            if (p2rawdata.children[5].batches.length == 1) {
+                this.player2.grappleCooldown = p2rawdata.children[5].batches[0].vertexData.length / 184;
+            }
+        } catch (e) { }
         this.player2.x = p2data.px / top.scale;
         this.player2.y = p2data.py / top.scale;
         this.player2.vx = p2data.xvel / top.scale;
@@ -64,23 +92,23 @@ export class State {
     }
 
     reward() {
-
         if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
             return {
-                p1: 1,
-                p2: -1.5
+                p1: 10,
+                p2: -10
             };
         } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
             return {
-                p1: -1.5,
-                p2: 1
-            };
-        } else {
-            return {
-                p1: +0.01,
-                p2: +0.01
+                p1: -10,
+                p2: 10
             };
         }
+        const dist = Math.hypot(this.player1.x - this.player2.x, this.player1.y - this.player2.y) * CONFIG.POSITION_NORMALIZATION;
+        const closenessReward = (1 - dist) * 0.3;
+        return {
+            p1: 0,
+            p2: 0
+        };
     }
 
     flip() {
@@ -98,6 +126,8 @@ export class State {
             this.player1.y * CONFIG.POSITION_NORMALIZATION,
             this.player1.vx * CONFIG.VELOCITY_NORMALIZATION,
             this.player1.vy * CONFIG.VELOCITY_NORMALIZATION,
+            this.player1.heavyAlpha,
+            this.player1.grappleCooldown,
             this.player1.keysPressed.left ? 1 : 0,
             this.player1.keysPressed.right ? 1 : 0,
             this.player1.keysPressed.up ? 1 : 0,
@@ -109,6 +139,8 @@ export class State {
             this.player2.y * CONFIG.POSITION_NORMALIZATION,
             this.player2.vx * CONFIG.VELOCITY_NORMALIZATION,
             this.player2.vy * CONFIG.VELOCITY_NORMALIZATION,
+            this.player2.heavyAlpha,
+            this.player2.grappleCooldown,
             this.player2.keysPressed.left ? 1 : 0,
             this.player2.keysPressed.right ? 1 : 0,
             this.player2.keysPressed.up ? 1 : 0,

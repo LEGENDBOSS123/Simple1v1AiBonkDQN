@@ -31,6 +31,25 @@ export function arrayToAction(arr) {
         heavy: sampleBernoulli(arr[4]) === 1,
         special: sampleBernoulli(arr[5]) === 1
     };
+    // return {
+    //     left: arr[0] >= 0.5,
+    //     right: arr[1] >= 0.5,
+    //     up: arr[2] >= 0.5,
+    //     down: arr[3] >= 0.5,
+    //     heavy: arr[4] >= 0.5,
+    //     special: arr[5] >= 0.5
+    // }
+}
+
+export function randomAction(p = 0.5) {
+    return {
+        left: Math.random() < p,
+        right: Math.random() < p,
+        up: Math.random() < p,
+        down: Math.random() < p,
+        heavy: Math.random() < p,
+        special: Math.random() < p
+    };
 }
 
 export function predictActionArray(model, state) {
