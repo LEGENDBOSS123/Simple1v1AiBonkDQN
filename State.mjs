@@ -57,7 +57,7 @@ export class State {
                 this.player1.grappleCooldown = p1rawdata.children[5].batches[0].vertexData.length / 184;
             }
         } catch (e) { }
-        this.player1.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_ONE_ID));
+        this.player1.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_ONE_ID) ?? 0);
 
 
         const p2data = top.playerids[CONFIG.PLAYER_TWO_ID].playerData2;
@@ -77,7 +77,7 @@ export class State {
         this.player2.y = p2data.py / top.scale;
         this.player2.vx = p2data.xvel / top.scale;
         this.player2.vy = p2data.yvel / top.scale;
-        this.player2.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_TWO_ID));
+        this.player2.keysPressed = top.GET_KEYS(keyMap.get(CONFIG.PLAYER_TWO_ID) ?? 0);
 
         this.done = !p1data.alive || !p2data.alive;
         if (this.done) {
@@ -94,20 +94,26 @@ export class State {
     reward() {
         if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
             return {
-                p1: 10,
-                p2: -10
+                p1: 2,
+                p2: -4
             };
         } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
             return {
-                p1: -10,
-                p2: 10
+                p1: -4,
+                p2: 2
             };
         }
+
+        // Reward shaping: encourage approaching the opponent
         const dist = Math.hypot(this.player1.x - this.player2.x, this.player1.y - this.player2.y) * CONFIG.POSITION_NORMALIZATION;
-        const closenessReward = (1 - dist) * 0.3;
+        const closenessReward = Math.max(0, (1 - dist) * 0.004);
+
+        // Tiny time penalty to encourage action
+        const timePenalty = -0.002;
+
         return {
-            p1: 0,
-            p2: 0
+            p1: timePenalty + closenessReward,
+            p2: timePenalty + closenessReward
         };
     }
 

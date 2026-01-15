@@ -1,7 +1,8 @@
 import { CONFIG } from "./config.mjs";
 import { log } from "./log.mjs";
-import { actionToArray, arrayToAction, getAction, move, predictActionArray, randomAction } from "./move.mjs";
+import { actionToArray, arrayToAction, getAction, move, predictActionArray, predictActionArrayRaw, randomAction } from "./move.mjs";
 import { Random } from "./Random.mjs";
+import { ReplayBuffer } from "./ReplayBuffer.mjs";
 import { setupLobby } from "./setupLobby.mjs";
 import { cloneModel, deserializeModels, loadBrowserFile, setupModel } from "./setupModel.mjs";
 import { State } from "./State.mjs";
@@ -11,16 +12,15 @@ import { train } from "./train.mjs";
 
 let models = [];
 let currentModel = null;
-let memory = [];
+let memory = new ReplayBuffer(CONFIG.REPLAY_BUFFER_SIZE);
 
-let actor_losses = [];
-let critic_losses = [];
+let losses = [];
+let trainSteps = 0;
 
 top.models = function () { return models; };
 top.currentModel = function () { return currentModel; };
 top.memory = function () { return memory; };
-top.actor_losses = function () { return actor_losses; };
-top.critic_losses = function () { return critic_losses; };
+top.losses = function () { return losses; };
 top.paused = false;
 
 async function setup() {
@@ -36,8 +36,7 @@ async function setup() {
         currentModel = setupModel();
     }
     log("TensorFlow.js version:", tf.version.tfjs);
-    log(`Actor model initialized with ${currentModel.actor.countParams()} parameters.`);
-    log(`Critic model initialized with ${currentModel.critic.countParams()} parameters.`);
+    log(`model initialized with ${currentModel.model.countParams()} parameters.`);
 }
 
 
@@ -51,6 +50,32 @@ async function main() {
     async function gameLoop() {
 
         while (true) {
+
+
+            if (memory.size() >= CONFIG.BATCH_SIZE) {
+                log("Training...");
+                const { batch, indices, importanceWeights } = memory.sample(CONFIG.BATCH_SIZE);
+                const result = await train(currentModel, batch, importanceWeights);
+                if (result) {
+                    losses.push(result.loss);
+                    log(`Loss: ${result.loss.toFixed(4)}`);
+                    trainSteps++;
+
+                    // Update target network periodically
+                    if (trainSteps % CONFIG.TARGET_UPDATE_FREQ === 0) {
+                        currentModel.target.setWeights(currentModel.model.getWeights());
+                        log("Target network updated.");
+                    }
+                }
+                if (losses.length % CONFIG.SAVE_AFTER_EPISODES === 0) {
+                    models.push(cloneModel(currentModel));
+                    if (models.length > 10) {
+                        models.shift();
+                    }
+                }
+                memory.updatePriorities(indices, result.tdErrors);
+            }
+
             // match start
             top.startGame();
             await Time.sleep(1500);
@@ -67,12 +92,12 @@ async function main() {
             let safeFrames = 0;
 
             let p2Model = currentModel;
-            if (Math.random() < 0.4 && models.length > 1) {
+            if (Math.random() < 0.5 && models.length > 1) {
                 p2Model = Random.choose(models);
             }
 
-            let lastActionP1 = null;  // Track the action we took
-
+            let lastActionP1 = null;
+            let lastActionP2 = null;
             while (true) {
 
                 newState = new State();
@@ -80,54 +105,50 @@ async function main() {
 
                 let rewardCurrentFrame = newState.reward();
                 let rewardP1 = rewardCurrentFrame.p1;
+                let rewardP2 = rewardCurrentFrame.p2;
 
-                // Store the action we ACTUALLY took last frame (not re-sampled)
                 if (lastActionP1 !== null) {
-                    memory.push({
-                        state: lastState.toArray(),
-                        action: lastActionP1,  // The exact sampled action
-                        reward: rewardP1,
-                        nextState: newState.toArray(),
-                        done: newState.done
-                    });
+                    memory.add(lastState.toArray(),
+                        lastActionP1,
+                        rewardP1,
+                        newState.toArray(),
+                        newState.done
+                    );
                 }
 
-                if (memory.length >= CONFIG.BATCH_SIZE) {
-                    log("Training...");
-                    const loss = await train(currentModel, memory);
-                    if (loss) {
-                        actor_losses.push(loss.actorLoss);
-                        critic_losses.push(loss.criticLoss);
-                        log(`Loss - Actor: ${loss.actorLoss.toFixed(4)}`);
-                        log(`Loss - Critic: ${loss.criticLoss.toFixed(4)}`);
-                    }
-                    if (actor_losses.length % CONFIG.SAVE_AFTER_EPISODES === 0) {
-                        models.push(cloneModel(currentModel));
-                        if (models.length > 5) {
-                            models.shift();
-                        }
-                    }
-                    memory.length = 0;
-                    newState.done = true;
+                if (lastActionP2 !== null) {
+                    memory.add(lastState.flip().toArray(),
+                        lastActionP2,
+                        rewardP2,
+                        newState.flip().toArray(),
+                        newState.done
+                    );
                 }
 
                 if (safeFrames > 300 || newState.done) {
                     break;
                 }
 
-                // Sample action and store the EXACT sample
-                let probs = predictActionArray(currentModel.actor, newState.toArray());
+                let probs = predictActionArray(currentModel.model, newState.toArray());
                 let ataP1 = arrayToAction(probs);
+                if (Math.random() < CONFIG.EPSILON) {
+                    ataP1 = randomAction();
+                }
                 move(CONFIG.PLAYER_ONE_ID, ataP1);
-                lastActionP1 = actionToArray(ataP1);  // Store the exact binary array
+                lastActionP1 = actionToArray(ataP1);
 
-                // P2
-                // let probs2 = predictActionArray(p2Model.actor, newState.flip().toArray());
-                // let actionObj2 = binaryArrayToActionObj(sampleActionFromProbs(probs2));
-                // move(CONFIG.PLAYER_TWO_ID, actionObj2);
+
+                let probs2 = predictActionArray(p2Model.model, newState.flip().toArray());
+                let ataP2 = arrayToAction(probs2);
+                if (Math.random() < CONFIG.EPSILON) {
+                    ataP2 = randomAction();
+                }
+                move(CONFIG.PLAYER_TWO_ID, ataP2);
+                lastActionP2 = actionToArray(ataP2);
 
                 safeFrames++;
                 lastState = newState;
+                CONFIG.EPSILON = Math.max(CONFIG.MIN_EPSILON, CONFIG.EPSILON - CONFIG.EPSILON_DECAY);
 
                 // 20 FPS
                 await Time.sleep(50);

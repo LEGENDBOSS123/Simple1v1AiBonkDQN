@@ -1,4 +1,4 @@
 export function log(...args) {
     console.log(...args);
-    top.displayInChat(args.join(" "));
+    // top.displayInChat(args.join(" "));
 }

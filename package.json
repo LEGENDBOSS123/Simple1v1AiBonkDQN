@@ -4,8 +4,8 @@
     "description": "This is a project to train AI to learn how to play simple 1v1 with itself. Could use same code to train AI on other maps. To run this code, simply copy paste the javascript file. Bonk Commands Mod is required to get player positions and velocities. ([Bonk Commands](https://greasyfork.org/en/scripts/451341-bonk-commands))",
     "main": "index.js",
     "scripts": {
-        "build": "esbuild main.mjs --bundle --minify --outfile=script.js --format=iife",
-        "watch": "esbuild main.mjs --bundle --minify --outfile=script.js --format=iife --watch"
+        "build": "esbuild main.mjs --bundle --outfile=script.js --format=iife",
+        "watch": "esbuild main.mjs --bundle --outfile=script.js --format=iife --watch"
     },
     "keywords": [],
     "author": "",

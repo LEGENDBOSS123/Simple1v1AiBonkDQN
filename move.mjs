@@ -18,27 +18,19 @@ export function actionToArray(action) {
         action.up ? 1 : 0,
         action.down ? 1 : 0,
         action.heavy ? 1 : 0,
-        action.special ? 1 : 0
+        action.special ? 1 : 0,
     ];
 }
 
 export function arrayToAction(arr) {
     return {
-        left: sampleBernoulli(arr[0]) === 1,
-        right: sampleBernoulli(arr[1]) === 1,
-        up: sampleBernoulli(arr[2]) === 1,
-        down: sampleBernoulli(arr[3]) === 1,
-        heavy: sampleBernoulli(arr[4]) === 1,
-        special: sampleBernoulli(arr[5]) === 1
-    };
-    // return {
-    //     left: arr[0] >= 0.5,
-    //     right: arr[1] >= 0.5,
-    //     up: arr[2] >= 0.5,
-    //     down: arr[3] >= 0.5,
-    //     heavy: arr[4] >= 0.5,
-    //     special: arr[5] >= 0.5
-    // }
+        left: arr[0] === 1,
+        right: arr[1] === 1,
+        up: arr[2] === 1,
+        down: arr[3] === 1,
+        heavy: arr[4] === 1,
+        special: arr[5] === 1
+    }
 }
 
 export function randomAction(p = 0.5) {
@@ -55,8 +47,25 @@ export function randomAction(p = 0.5) {
 export function predictActionArray(model, state) {
     return tf.tidy(() => {
         const stateTensor = tf.tensor2d([state]);
-        const actionProbs = model.predict(stateTensor);
-        return actionProbs.dataSync();
+        const [V, ...advantages] = model.predict(stateTensor);
+        const action = advantages.map(A => {
+            const advMean = A.mean(1, true);
+            const centeredAdv = A.sub(advMean);
+            const Q = V.add(centeredAdv);
+            return Q.argMax(1).dataSync()[0];
+        });
+        return action;
+    });
+}
+
+export function predictActionArrayRaw(model, state) {
+    return tf.tidy(() => {
+        const stateTensor = tf.tensor2d([state]);
+        const [V, ...advantages] = model.predict(stateTensor);
+        const action = advantages.map(A => {
+            return A.dataSync();
+        });
+        return action;
     });
 }
 

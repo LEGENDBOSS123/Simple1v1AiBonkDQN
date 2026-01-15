@@ -1,70 +1,62 @@
 import { CONFIG } from "./config.mjs";
 import { tf } from "./tf.mjs";
 
-// Actor Critic
 
-export function setupModel() {
-    // Actor
-    const actor = tf.sequential();
-    actor.add(tf.layers.dense({
-        inputShape: [CONFIG.GAME_STATE_SIZE],
-        units: CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS[0],
-        activation: 'relu',
-        kernelInitializer: 'heNormal'
-    }));
-    for (let i = 1; i < CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS.length; i++) {
-        actor.add(tf.layers.dense({
-            units: CONFIG.ACTOR_HIDDEN_LAYER_LENGTHS[i],
+function setupDuelingModel() {
+    const input = tf.input({ shape: [CONFIG.GAME_STATE_SIZE] });
+
+    let x = input;
+    for (const units of CONFIG.DUELING_SHARED_LAYER_LENGTHS) {
+        x = tf.layers.dense({
+            units: units,
             activation: 'relu',
             kernelInitializer: 'heNormal'
-        }));
+        }).apply(x);
     }
-    actor.add(tf.layers.dense({
-        units: CONFIG.ACTION_SIZE,
-        activation: 'sigmoid',
-        kernelInitializer: 'glorotUniform'
-    }));
 
-    // Critic
-    const critic = tf.sequential();
-    critic.add(tf.layers.dense({
-        inputShape: [CONFIG.GAME_STATE_SIZE],
-        units: CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS[0],
-        activation: 'relu',
-        kernelInitializer: 'heNormal'
-    }));
-    for (let i = 1; i < CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS.length; i++) {
-        critic.add(tf.layers.dense({
-            units: CONFIG.CRITIC_HIDDEN_LAYER_LENGTHS[i],
-            activation: 'relu',
-            kernelInitializer: 'heNormal'
-        }));
-    }
-    critic.add(tf.layers.dense({
+
+    let critic = tf.layers.dense({
         units: 1,
         activation: 'linear',
         kernelInitializer: 'glorotUniform'
-    }));
+    }).apply(x);
 
-    const actorOptimizer = tf.train.adam(CONFIG.ACTOR_LEARNING_RATE);
-    const criticOptimizer = tf.train.adam(CONFIG.CRITIC_LEARNING_RATE);
 
-    const model = {
-        actor: actor,
-        critic: critic,
-        optimizer: {
-            actor: actorOptimizer,
-            critic: criticOptimizer
-        }
+    const advantages = [];
+    for (let i = 0; i < CONFIG.ACTION_SIZE; i++) {
+        advantages.push(
+            tf.layers.dense({
+                units: 2,
+                name: `adv_${i}`,
+                activation: 'linear',
+                kernelInitializer: 'glorotUniform'
+            }).apply(x)
+        );
+    }
+
+    return tf.model({
+        inputs: input,
+        outputs: [critic, ...advantages]
+    });
+}
+
+export function setupModel() {
+    const model = setupDuelingModel();
+    const target = setupDuelingModel();
+    target.setWeights(model.getWeights());
+    const optimizer = tf.train.adam(CONFIG.LEARNING_RATE);
+    return {
+        model: model,
+        target: target,
+        optimizer: optimizer
     };
-    return model;
 }
 
 
 export function cloneModel(model) {
     const newModel = setupModel();
-    newModel.actor.setWeights(model.actor.getWeights());
-    newModel.critic.setWeights(model.critic.getWeights());
+    newModel.model.setWeights(model.model.getWeights());
+    newModel.target.setWeights(model.target.getWeights());
     return newModel;
 }
 
@@ -86,11 +78,11 @@ export async function serializeModels(models, currentModel) {
 
     const serializedModels = [];
     for (const model of arrayOfModels) {
-        const artifactsActor = await downloadModel(model.actor);
-        const artifactsCritic = await downloadModel(model.critic);
+        const artifactsModel = await downloadModel(model.model);
+        const artifactsTarget = await downloadModel(model.target);
         const artifacts = {
-            actor: artifactsActor,
-            critic: artifactsCritic
+            model: artifactsModel,
+            target: artifactsTarget
         };
         serializedModels.push(artifacts);
     }
@@ -104,8 +96,8 @@ top.saveModels = async function () {
 
 export async function loadModelFromArtifacts(artifacts) {
     const model = setupModel();
-    model.actor.loadWeights(new Float32Array(artifacts.actor.weightData).buffer, artifacts.actor.weightSpecs);
-    model.critic.loadWeights(new Float32Array(artifacts.critic.weightData).buffer, artifacts.critic.weightSpecs);
+    model.model.loadWeights(new Float32Array(artifacts.model.weightData).buffer, artifacts.model.weightSpecs);
+    model.target.loadWeights(new Float32Array(artifacts.target.weightData).buffer, artifacts.target.weightSpecs);
     return model;
 }
 
