@@ -57,27 +57,28 @@ export async function train(models, batch, importanceWeights = null) {
 
         // Get current Q-values for TD error calculation
         const [Vcurr, ...Acurr] = model.predict(states);
-        let tdErrorSum = tf.zeros([batch.length]);
+        let tdErrorMax = tf.zeros([batch.length]);
 
         for (let i = 0; i < numActions; i++) {
             const actionIdx = actions.slice([0, i], [-1, 1]).squeeze([1]).toInt();
             const currentQ = selectQForActions(computeQ(Vcurr, Acurr[i]), actionIdx);
-            tdErrorSum = tdErrorSum.add(targets[i].sub(currentQ).abs());
+            const branchTdError = targets[i].sub(currentQ).abs();
+            tdErrorMax = tf.maximum(tdErrorMax, branchTdError);
         }
-        const tdErrors = tdErrorSum.div(numActions);
+        const tdErrors = tdErrorMax;
 
-        // Optimization step
         const loss = optimizer.minimize(() => {
             const [V, ...As] = model.apply(states, { training: true });
-            let totalLoss = tf.scalar(0);
+            let totalLoss = tf.zeros([batch.length]);
 
             for (let i = 0; i < numActions; i++) {
                 const actionIdx = actions.slice([0, i], [-1, 1]).squeeze([1]).toInt();
                 const predictedQ = selectQForActions(computeQ(V, As[i]), actionIdx);
-                const branchLoss = tf.losses.huberLoss(targets[i], predictedQ, weights);
+                const branchLoss = tf.losses.huberLoss(targets[i], predictedQ, undefined, undefined, tf.Reduction.NONE);
                 totalLoss = totalLoss.add(branchLoss);
             }
-            return totalLoss.div(numActions);
+            // Average across branches, then apply importance weights, then take mean
+            return totalLoss.div(numActions).mul(weights).mean();
         }, true);
 
         return {

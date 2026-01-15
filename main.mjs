@@ -27,9 +27,10 @@ async function setup() {
     const filePrompt = prompt("Do you want to load a model from file? (y/n)", "n") == "y";
     const filedata = filePrompt ? await loadBrowserFile() : null;
     if (filedata) {
-        const deserialized = await deserializeModels(filedata);
+        const deserialized = await deserializeModels(filedata.models);
         models = deserialized.models;
         currentModel = deserialized.currentModel;
+        memory = ReplayBuffer.fromJSON(filedata.per);
         log(`Loaded ${models.length} models from file.`);
     }
     else {
@@ -54,7 +55,12 @@ async function main() {
 
             if (memory.size() >= CONFIG.BATCH_SIZE) {
                 log("Training...");
-                const { batch, indices, importanceWeights } = memory.sample(CONFIG.BATCH_SIZE);
+                // Anneal beta from PER_BETA_START to PER_BETA_END over PER_BETA_FRAMES
+                const beta = Math.min(
+                    CONFIG.PER_BETA_END,
+                    CONFIG.PER_BETA_START + (CONFIG.PER_BETA_END - CONFIG.PER_BETA_START) * (trainSteps / CONFIG.PER_BETA_FRAMES)
+                );
+                const { batch, indices, importanceWeights } = memory.sample(CONFIG.BATCH_SIZE, CONFIG.PER_ALPHA, beta);
                 const result = await train(currentModel, batch, importanceWeights);
                 if (result) {
                     losses.push(result.loss);

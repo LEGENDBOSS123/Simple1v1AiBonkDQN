@@ -6,8 +6,10 @@ function setupDuelingModel() {
     const input = tf.input({ shape: [CONFIG.GAME_STATE_SIZE] });
 
     let x = input;
+    let layerIndex = 1;
     for (const units of CONFIG.DUELING_SHARED_LAYER_LENGTHS) {
         x = tf.layers.dense({
+            name: `dense_Dense${layerIndex++}`,
             units: units,
             activation: 'relu',
             kernelInitializer: 'heNormal'
@@ -16,6 +18,7 @@ function setupDuelingModel() {
 
 
     let critic = tf.layers.dense({
+        name: `dense_Dense${layerIndex++}`,
         units: 1,
         activation: 'linear',
         kernelInitializer: 'glorotUniform'
@@ -36,7 +39,7 @@ function setupDuelingModel() {
 
     return tf.model({
         inputs: input,
-        outputs: [critic, ...advantages]
+        outputs: [critic, ...advantages],
     });
 }
 
@@ -91,13 +94,31 @@ export async function serializeModels(models, currentModel) {
 
 top.saveModels = async function () {
     const serializedModels = await serializeModels(top.models(), top.currentModel());
-    await saveBrowserFile(serializedModels, "models.json");
+    const json = {
+        models: serializedModels,
+        per: top.memory().toJSON()
+    }
+    await saveBrowserFile(json, "models.json");
 }
 
 export async function loadModelFromArtifacts(artifacts) {
     const model = setupModel();
-    model.model.loadWeights(new Float32Array(artifacts.model.weightData).buffer, artifacts.model.weightSpecs);
-    model.target.loadWeights(new Float32Array(artifacts.target.weightData).buffer, artifacts.target.weightSpecs);
+    console.log(artifacts.model.weightData, artifacts.model.weightSpecs);
+    console.log(artifacts.target.weightData, artifacts.target.weightSpecs);
+    for (let i = 0; i < 4; i++) {
+
+        artifacts.model.weightSpecs[2 * i].name = "dense_Dense" + (i + 1) + "/kernel";
+        artifacts.model.weightSpecs[2 * i + 1].name = "dense_Dense" + (i + 1) + "/bias";
+    }
+    for (let i = 0; i < 4; i++) {
+
+        artifacts.target.weightSpecs[2 * i].name = "dense_Dense" + (i + 1) + "/kernel";
+        artifacts.target.weightSpecs[2 * i + 1].name = "dense_Dense" + (i + 1) + "/bias";
+    }
+
+    model.model.loadWeights(tf.io.decodeWeights(new Float32Array(artifacts.model.weightData).buffer, artifacts.model.weightSpecs));
+    model.target.loadWeights(tf.io.decodeWeights(new Float32Array(artifacts.target.weightData).buffer, artifacts.target.weightSpecs));
+    console.log(model);
     return model;
 }
 

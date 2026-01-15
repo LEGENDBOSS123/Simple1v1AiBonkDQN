@@ -14,9 +14,15 @@ export class ReplayBuffer {
             nextState,
             done
         }
-
-        const maxPriority = this.priorities.length > 0 ? Math.max(...this.priorities) : 1.0;
-
+        let maxPriority = 0;
+        for (let i = 0; i < this.priorities.length; i++) {
+            if (this.priorities[i] > maxPriority) {
+                maxPriority = this.priorities[i];
+            }
+        }
+        if (maxPriority === 0) {
+            maxPriority = 1.0;
+        }
         if (this.buffer.length < this.maxSize) {
             this.buffer.push(memory);
             this.priorities.push(maxPriority);
@@ -28,7 +34,7 @@ export class ReplayBuffer {
         }
     }
 
-    sample(batchSize, alpha = 0.6) {
+    sample(batchSize, alpha = 0.6, beta = 0.4) {
         if (this.buffer.length === 0) {
             return { batch: [], indices: [], importanceWeights: [] };
         }
@@ -38,7 +44,7 @@ export class ReplayBuffer {
 
         const indices = [];
         const batch = [];
-        const importanceWeights = [];
+        const rawWeights = [];
 
         for (let i = 0; i < batchSize; i++) {
             const targetSum = Math.random() * sumProbs;
@@ -54,10 +60,15 @@ export class ReplayBuffer {
             indices.push(index);
             batch.push(this.buffer[index]);
 
+            // Importance sampling weight: (1 / (N * P(i)))^beta
             const prob = probs[index] / sumProbs;
-            const weight = Math.pow(1 / (this.buffer.length * prob), 0.4);
-            importanceWeights.push(weight);
+            const weight = Math.pow(1 / (this.buffer.length * prob), beta);
+            rawWeights.push(weight);
         }
+
+        // Normalize weights by max weight for stability
+        const maxWeight = Math.max(...rawWeights);
+        const importanceWeights = rawWeights.map(w => w / maxWeight);
 
         return { batch, indices, importanceWeights };
     }
@@ -71,5 +82,22 @@ export class ReplayBuffer {
 
     size() {
         return this.buffer.length;
+    }
+
+    toJSON() {
+        return {
+            buffer: this.buffer,
+            priorities: this.priorities,
+            maxSize: this.maxSize,
+            position: this.position
+        };
+    }
+
+    static fromJSON(json) {
+        const replayBuffer = new ReplayBuffer(json.maxSize);
+        replayBuffer.buffer = json.buffer;
+        replayBuffer.priorities = json.priorities;
+        replayBuffer.position = json.position ?? 0;
+        return replayBuffer;
     }
 }

@@ -9,6 +9,12 @@ export const CONFIG = {
     REPLAY_BUFFER_SIZE: 500_000,
     TARGET_UPDATE_FREQ: 100,
 
+    // Prioritized Experience Replay parameters
+    PER_ALPHA: 0.6,       // Priority exponent (0 = uniform, 1 = full prioritization)
+    PER_BETA_START: 0.4,  // Initial importance sampling exponent
+    PER_BETA_END: 1.0,    // Final importance sampling exponent
+    PER_BETA_FRAMES: 100000, // Number of frames to anneal beta
+
     EPSILON: 1,
     MIN_EPSILON: 0.05,
     EPSILON_DECAY: 0.000035,
