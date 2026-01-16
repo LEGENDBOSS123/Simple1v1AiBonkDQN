@@ -1,4 +1,4 @@
-import { CONFIG } from "./config.mjs";
+import { CONFIG, updateConfig } from "./config.mjs";
 import { log } from "./log.mjs";
 import { actionToArray, arrayToAction, getAction, move, predictActionArray, predictActionArrayRaw, randomAction } from "./move.mjs";
 import { Random } from "./Random.mjs";
@@ -27,6 +27,7 @@ async function setup() {
     const filePrompt = prompt("Do you want to load a model from file? (y/n)", "n") == "y";
     const filedata = filePrompt ? await loadBrowserFile() : null;
     if (filedata) {
+        updateConfig(filedata.CONFIG);
         const deserialized = await deserializeModels(filedata.models);
         models = deserialized.models;
         currentModel = deserialized.currentModel;
@@ -60,26 +61,30 @@ async function main() {
                     CONFIG.PER_BETA_END,
                     CONFIG.PER_BETA_START + (CONFIG.PER_BETA_END - CONFIG.PER_BETA_START) * (trainSteps / CONFIG.PER_BETA_FRAMES)
                 );
-                const { batch, indices, importanceWeights } = memory.sample(CONFIG.BATCH_SIZE, CONFIG.PER_ALPHA, beta);
-                const result = await train(currentModel, batch, importanceWeights);
-                if (result) {
-                    losses.push(result.loss);
-                    log(`Loss: ${result.loss.toFixed(4)}`);
-                    trainSteps++;
+                for (let i = 0; i < CONFIG.TRAIN_COUNT; i++) {
+                    const { batch, indices, importanceWeights } = memory.sample(CONFIG.BATCH_SIZE, CONFIG.PER_ALPHA, beta);
+                    const result = await train(currentModel, batch, importanceWeights);
+                    if (result) {
+                        losses.push(result.loss);
+                        log(`Loss: ${result.loss.toFixed(4)}`);
+                        trainSteps++;
 
-                    // Update target network periodically
-                    if (trainSteps % CONFIG.TARGET_UPDATE_FREQ === 0) {
-                        currentModel.target.setWeights(currentModel.model.getWeights());
-                        log("Target network updated.");
+                        // Update target network periodically
+                        if (trainSteps % CONFIG.TARGET_UPDATE_FREQ === 0) {
+                            currentModel.target.setWeights(currentModel.model.getWeights());
+                            log("Target network updated.");
+                        }
                     }
+                    memory.updatePriorities(indices, result.tdErrors);
                 }
-                if (losses.length % CONFIG.SAVE_AFTER_EPISODES === 0) {
+                // Save model checkpoint after training batch
+                if (trainSteps % CONFIG.SAVE_AFTER_EPISODES === 0 && trainSteps > 0) {
                     models.push(cloneModel(currentModel));
                     if (models.length > 10) {
                         models.shift();
                     }
+                    log(`Model checkpoint saved. Total checkpoints: ${models.length}`);
                 }
-                memory.updatePriorities(indices, result.tdErrors);
             }
 
             // match start

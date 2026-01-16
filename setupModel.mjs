@@ -96,7 +96,8 @@ top.saveModels = async function () {
     const serializedModels = await serializeModels(top.models(), top.currentModel());
     const json = {
         models: serializedModels,
-        per: top.memory().toJSON()
+        per: top.memory().toJSON(),
+        CONFIG: CONFIG
     }
     await saveBrowserFile(json, "models.json");
 }
@@ -132,14 +133,26 @@ export async function deserializeModels(arrayOfArtifacts) {
     return { models, currentModel };
 }
 
-export async function saveBrowserFile(filedata, filename) {
-    const jsonString = JSON.stringify(filedata);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
 
+export async function saveBrowserFile(filedata, filename) {
+    // 1. Convert JSON to string
+    const jsonString = JSON.stringify(filedata);
+
+    // 2. Create a stream from the string data
+    const stream = new Blob([jsonString]).stream();
+
+    // 3. Pipe through GZIP compression
+    const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+
+    // 4. Convert stream back to a Blob
+    const compressedBlob = await new Response(compressedStream).blob();
+
+    // 5. Download logic (Standard)
+    const url = URL.createObjectURL(compressedBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    // Append .gz to indicate compression, or keep original if you handle extension logic elsewhere
+    a.download = filename.endsWith('.gz') ? filename : filename + '.gz';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -147,28 +160,43 @@ export async function saveBrowserFile(filedata, filename) {
     URL.revokeObjectURL(url);
 }
 
+/**
+ * Loads a GZIP compressed file from the user and parses it back to JSON.
+ */
 export function loadBrowserFile() {
     return new Promise((resolve, reject) => {
         const input = document.createElement("input");
         input.type = "file";
-        input.accept = "application/json";
+        // Accept .json or .gz files
+        input.accept = "application/json, .gz";
 
-        input.onchange = (event) => {
+        input.onchange = async (event) => {
             const file = event.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => {
+            if (!file) return;
+
+            try {
+                // 1. Get the stream from the file
+                const stream = file.stream();
+
+                // 2. Pipe through GZIP decompression
+                const decompressedStream = stream.pipeThrough(new DecompressionStream("gzip"));
+
+                // 3. Read the decompressed stream as text
+                const text = await new Response(decompressedStream).text();
+
+                // 4. Parse JSON
+                const filedata = JSON.parse(text);
+                resolve(filedata);
+            } catch (error) {
+                console.error("Decompression failed. Was the file actually compressed?", error);
+                // Fallback: Try reading as plain JSON in case the user uploaded an uncompressed file
                 try {
-                    const content = e.target.result;
-                    const filedata = JSON.parse(content);
-                    resolve(filedata);
-                } catch (error) {
+                    const text = await file.text();
+                    resolve(JSON.parse(text));
+                } catch (fallbackError) {
                     reject(error);
                 }
-            };
-            reader.onerror = (e) => {
-                reject(e);
-            };
-            reader.readAsText(file);
+            }
         };
 
         input.click();

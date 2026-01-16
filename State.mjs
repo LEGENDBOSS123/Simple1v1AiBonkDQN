@@ -94,26 +94,27 @@ export class State {
     reward() {
         if (this.winnerId === CONFIG.PLAYER_ONE_ID) {
             return {
-                p1: 2,
-                p2: -4
+                p1: 1,
+                p2: -1
             };
         } else if (this.winnerId === CONFIG.PLAYER_TWO_ID) {
             return {
-                p1: -4,
-                p2: 2
+                p1: -1,
+                p2: 1
             };
         }
 
-        // Reward shaping: encourage approaching the opponent
         const dist = Math.hypot(this.player1.x - this.player2.x, this.player1.y - this.player2.y) * CONFIG.POSITION_NORMALIZATION;
-        const closenessReward = Math.max(0, (1 - dist) * 0.004);
+        const closenessReward = Math.max(0, (1 - dist) * 0.01);
 
-        // Tiny time penalty to encourage action
-        const timePenalty = -0.002;
+        const timePenalty = -0.0025;
+
+        const p1Reward = timePenalty + closenessReward;
+        const p2Reward = timePenalty + closenessReward;
 
         return {
-            p1: timePenalty + closenessReward,
-            p2: timePenalty + closenessReward
+            p1: p1Reward,
+            p2: p2Reward
         };
     }
 
@@ -152,7 +153,12 @@ export class State {
             this.player2.keysPressed.up ? 1 : 0,
             this.player2.keysPressed.down ? 1 : 0,
             this.player2.keysPressed.heavy ? 1 : 0,
-            this.player2.keysPressed.special ? 1 : 0
+            this.player2.keysPressed.special ? 1 : 0,
+
+            CONFIG.POSITION_NORMALIZATION * (this.player1.x - this.player2.x),
+            CONFIG.POSITION_NORMALIZATION * (this.player1.y - this.player2.y),
+            CONFIG.VELOCITY_NORMALIZATION * (this.player1.vx - this.player2.vx),
+            CONFIG.VELOCITY_NORMALIZATION * (this.player1.vy - this.player2.vy)
         ];
     }
 }
